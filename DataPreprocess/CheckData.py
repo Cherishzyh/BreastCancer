@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from MeDIT.Normalize import Normalize01, NormalizeZ
 from MeDIT.Visualization import Imshow3DArray
 from MeDIT.ArrayProcess import ExtractBlock
+from MeDIT.SaveAndLoad import LoadImage
 
 
 def GetCenter(roi):
@@ -17,6 +18,17 @@ def GetCenter(roi):
     center_x = int(np.median(np.unique(non_zero[1])))
     center_y = int(np.median(np.unique(non_zero[0])))
     return (center_x, center_y)
+
+
+def GetCenter3D(roi):
+    roi = np.squeeze(roi)
+
+    non_zero = np.nonzero(roi)
+    center_y = int(np.median(np.unique(non_zero[0])))
+    center_x = int(np.median(np.unique(non_zero[1])))
+    center_z = int(np.median(np.unique(non_zero[2])))
+    return (center_x, center_y, center_z)
+
 
 
 def CheckNPY():
@@ -93,6 +105,8 @@ def CropData():
         # plt.show()
 # CropData()
 
+
+
 def CropROI():
     data_folder = r'/home/zhangyihong/Documents/BreastClassification/DCEPost/lesion_roi_norm'
     new_folder = r'/home/zhangyihong/Documents/BreastClassification/DCEPost/lesion_roi_crop_norm'
@@ -103,4 +117,136 @@ def CropROI():
         center = GetCenter(cancer)
         cancer_crop, _ = ExtractBlock(cancer, patch_size=[3, 100, 100], center_point=(-1, center[1], center[0]))
         np.save(os.path.join(new_folder, case), cancer_crop)
-CropROI()
+# CropROI()
+
+
+
+def Statistical():
+    data_folder = r'V:\jzhang\breastFormatNew'
+    for case in os.listdir(data_folder):
+        case_folder = os.path.join(data_folder, case)
+        if not os.path.isdir(case_folder):
+            continue
+        else:
+            '''ESER_1.nii.gz, ADC_Reg.nii.gz, t2_W_Reg.nii.gz.....roi3D.nii'''
+            eser, _, _ = LoadImage(os.path.join(case_folder, 'ESER_1.nii.gz'), is_show_info=False)
+            adc, _, _ = LoadImage(os.path.join(case_folder, 'ADC_Reg.nii.gz'), is_show_info=False)
+            t2_W, _, _ = LoadImage(os.path.join(case_folder, 't2_W_Reg.nii.gz'), is_show_info=False)
+            roi, _, _ = LoadImage(os.path.join(case_folder, 'roi3D.nii'), is_show_info=False)
+            if not (eser.GetSize() == adc.GetSize() == t2_W.GetSize() == roi.GetSize()):
+                print('Size: {}'.format(case))
+            # if not (eser.GetDirection() == adc.GetDirection() == t2_W.GetDirection() == roi.GetDirection()):
+            #     print('Direction: {}'.format(case))
+            if not (eser.GetSpacing() == adc.GetSpacing() == t2_W.GetSpacing() == roi.GetSpacing()):
+                print('Spacing: {}'.format(case))
+            if not (eser.GetOrigin() == adc.GetOrigin() == t2_W.GetOrigin() == roi.GetOrigin()):
+                print('Origin: {}'.format(case))
+# Statistical()
+
+
+def StatisticalSpacing():
+    data_folder = r'V:\jzhang\breastFormatNew'
+    for case in os.listdir(data_folder):
+        case_folder = os.path.join(data_folder, case)
+        if not os.path.isdir(case_folder):
+            continue
+        else:
+            '''ESER_1.nii.gz, ADC_Reg.nii.gz, t2_W_Reg.nii.gz.....roi3D.nii'''
+            eser, _, _ = LoadImage(os.path.join(case_folder, 'ESER_1.nii.gz'), is_show_info=False)
+            print('{} {}'.format(eser.GetSpacing(), case))
+
+# StatisticalSpacing()
+
+
+def LoadData(type_list):
+    ''' ESER_1.nii.gz, ADC_Reg.nii.gz, t2_W_Reg.nii.gz.....roi3D.nii '''
+
+    data_folder = r'V:\yhzhang\BreastNii'
+
+    for case in os.listdir(data_folder):
+        # if 'E416' not in case:
+        #     continue
+        case_folder = os.path.join(data_folder, case)
+        if not os.path.isdir(case_folder):
+            continue
+        else:
+            image_list, data_list = [], []
+            for data_type in type_list:
+                image, data, _ = LoadImage(os.path.join(case_folder, data_type), is_show_info=False)
+                image_list.append(image)
+                data_list.append(data)
+            yield case, image_list, data_list
+
+
+def Shape():
+    slice_list = []
+    height_list = []
+    width_list = []
+    case_list = []
+    for case, image, data in LoadData('roi3D.nii'):
+        # if case != 'A191_GE CHUN YIN':
+        #     continue
+        height = list(sorted(set(np.nonzero(data)[0])))
+        width = list(sorted(set(np.nonzero(data)[1])))
+        slice = list(sorted(set(np.nonzero(data)[2])))
+
+        height_list.append(height[-1] - height[0])
+        width_list.append(width[-1] - width[0])
+        slice_list.append(slice[-1] - slice[0])
+        case_list.append(case)
+    print(sorted(slice_list))
+    print(sorted(height_list))
+    print(sorted(width_list))
+    # print(case_list[slice_list.index(max(slice_list))],
+    #       case_list[height_list.index(max(height_list))],
+    #       case_list[width_list.index(max(width_list))])
+    print()
+# Shape()
+
+
+def TestCrop():
+    for case, image_list, data_list in LoadData(['roi3D.nii']):
+        image = image_list[0]
+        data = data_list[0]
+        x, y, z = GetCenter3D(data)
+        plt.imshow(data[..., z], cmap='gray')
+        plt.scatter(x, y)
+        plt.show()
+# TestCrop()
+
+
+def CropData3D():
+    from MeDIT.ArrayProcess import ExtractBlock
+    from MeDIT.Normalize import NormalizeZ
+    for case, image_list, data_list in LoadData(['ESER_1.nii.gz', 'ADC_Reg.nii.gz', 't2_W_Reg.nii.gz', 'roi3D.nii']):
+        print(case)
+        eser = data_list[0]
+        adc = data_list[1]
+        t2 = data_list[2]
+        roi = data_list[3]
+        x, y, z = GetCenter3D(roi)
+        crop_eser, _ = ExtractBlock(eser, (100, 100, 50), center_point=(y, x, z), is_shift=True)
+        crop_adc, _ = ExtractBlock(adc, (100, 100, 50), center_point=(y, x, z), is_shift=True)
+        crop_t2, _ = ExtractBlock(t2, (100, 100, 50), center_point=(y, x, z), is_shift=True)
+        crop_roi, _ = ExtractBlock(roi, (100, 100, 50), center_point=(y, x, z), is_shift=True)
+        np.save(os.path.join(r'V:\yhzhang\BreastNpy\Eser', '{}.npy'.format(case)), NormalizeZ(crop_eser))
+        np.save(os.path.join(r'V:\yhzhang\BreastNpy\Adc', '{}.npy'.format(case)), NormalizeZ(crop_adc))
+        np.save(os.path.join(r'V:\yhzhang\BreastNpy\T2', '{}.npy'.format(case)), NormalizeZ(crop_t2))
+        np.save(os.path.join(r'V:\yhzhang\BreastNpy\Roi', '{}.npy'.format(case)), crop_roi)
+
+# CropData3D()
+
+
+from MeDIT.Visualization import FlattenImages
+for case in os.listdir(r'V:\yhzhang\BreastNpy\Adc'):
+    data = np.load(os.path.join(r'V:\yhzhang\BreastNpy\T2', case))
+    roi = np.load(os.path.join(r'V:\yhzhang\BreastNpy\Roi', case))
+    flatten_data = FlattenImages(np.transpose(data, axes=(2, 0, 1)))
+    flatten_roi = FlattenImages(np.transpose(roi, axes=(2, 0, 1)))
+
+    plt.figure(figsize=(16, 16))
+    plt.imshow(flatten_data, cmap='gray')
+    plt.contour(flatten_roi, colors='r')
+    plt.axis('off')
+    plt.savefig(os.path.join(r'V:\yhzhang\BreastNpy\Image', '{}.jpg'.format(case.split('.npy')[0])))
+    plt.close()

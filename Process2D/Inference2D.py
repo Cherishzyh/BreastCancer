@@ -182,14 +182,14 @@ if __name__ == '__main__':
     # EnsembleInference(model_root, data_root, model_name, 'all_train', weights_list=None)
     # EnsembleInference(model_root, data_root, model_name, 'test', weights_list=None)
 
-    model_name = 'ResNeXt_CBAM_0929_80x80_cancer'
-    EnsembleInference(model_root, data_root, model_name, 'all_train', weights_list=None)
-    EnsembleInference(model_root, data_root, model_name, 'test', weights_list=None)
+    model_name = 'ResNeXt_CBAM_0929_80x80'
+    # EnsembleInference(model_root, data_root, model_name, 'all_train', weights_list=None)
+    # EnsembleInference(model_root, data_root, model_name, 'test', weights_list=None)
 
 
-    # Result4NPY(os.path.join(model_root, model_name), data_type='all_train')
-    # Result4NPY(os.path.join(model_root, model_name), data_type='test')
-    # DrawROC(os.path.join(model_root, model_name))
+    Result4NPY(os.path.join(model_root, model_name), data_type='all_train')
+    Result4NPY(os.path.join(model_root, model_name), data_type='test')
+    DrawROC(os.path.join(model_root, model_name))
 
     # EnsembleInferenceBySeg(model_root, data_root, model_name, 'non_alltrain', weights_list=None, n_class=2)
     # EnsembleInferenceBySeg(model_root, data_root, model_name, 'non_test', weights_list=None, n_class=2)

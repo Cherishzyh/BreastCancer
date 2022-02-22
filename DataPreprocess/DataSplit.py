@@ -1,6 +1,11 @@
 import os
+import shutil
+
 import pandas as pd
 from random import shuffle
+import SimpleITK as sitk
+
+from MeDIT.SaveAndLoad import LoadImage
 
 
 def DataSplit(cv = 5):
@@ -31,6 +36,37 @@ def CombineCSV():
     test_df = pd.read_csv(test_csv)
     new_df = train_df.append(test_df, ignore_index=True)
     new_df.to_csv(r'/home/zhangyihong/Documents/BreastClassification/DCEPost/label.csv', index=False)
-CombineCSV()
+# CombineCSV()
 
 
+def CopyFolder():
+    source_folder = r'V:\jzhang\breastFormatNew'
+    des_folder = r'V:\yhzhang\Breast'
+    for case in os.listdir(source_folder):
+        if case == 'A029_QIN LU':
+            continue
+        source_path = os.path.join(source_folder, case)
+        if not os.path.isdir(source_path):
+            continue
+        des_path = os.path.join(des_folder, case)
+        if not os.path.exists(des_path):
+            os.mkdir(des_path)
+        shutil.copyfile(os.path.join(source_path, 'ESER_1.nii.gz'), os.path.join(des_path, 'ESER_1.nii.gz'))
+        shutil.copyfile(os.path.join(source_path, 'ADC_Reg.nii.gz'), os.path.join(des_path, 'ADC_Reg.nii.gz'))
+        shutil.copyfile(os.path.join(source_path, 't2_W_Reg.nii.gz'), os.path.join(des_path, 't2_W_Reg.nii.gz'))
+        shutil.copyfile(os.path.join(source_path, 'roi3D.nii'), os.path.join(des_path, 'roi3D.nii'))
+# CopyFolder()
+
+def GenerateLabel():
+    folder = r'V:\jzhang\breastFormatNew'
+    case_list = []
+    label_list = []
+    for case in os.listdir(folder):
+        case_folder = os.path.join(folder, case)
+        if not os.path.isdir(case_folder): continue
+        label_csv = pd.read_csv(os.path.join(case_folder, 'label.csv'))
+        case_list.append(case)
+        label_list.append(label_csv.columns.values.squeeze())
+    df = pd.DataFrame({'CaseName': case_list, 'Label': label_list})
+    df.to_csv(r'V:\yhzhang\label.csv', index=False)
+# GenerateLabel()
