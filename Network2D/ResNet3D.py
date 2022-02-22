@@ -112,20 +112,25 @@ class I3Res50(nn.Module):
         self.conv1 = nn.Conv3d(3, 64, kernel_size=(5, 7, 7), stride=(2, 2, 2), padding=(2, 3, 3), bias=False)
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 3, 3), stride=(2, 2, 2), padding=(0, 0, 0))
-        self.maxpool2 = nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1), padding=(0, 0, 0))
+        # self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 3, 3), stride=(2, 2, 2), padding=(0, 0, 0))
+        # self.maxpool2 = nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1), padding=(0, 0, 0))
 
         nonlocal_mod = 2 if use_nl else 1000
         self.layer1 = self._make_layer(block, 64, layers[0], stride=1, temp_conv=[1, 1, 1], temp_stride=[1, 1, 1])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, temp_conv=[1, 0, 1, 0],
                                        temp_stride=[1, 1, 1, 1], nonlocal_mod=nonlocal_mod)
+        self.conv2 = nn.Conv3d(128 * block.expansion, 128 * block.expansion, kernel_size=(3, 1, 1), stride=(2, 1, 1),
+                               padding=(1, 0, 0))
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, temp_conv=[1, 0, 1, 0, 1, 0],
                                        temp_stride=[1, 1, 1, 1, 1, 1], nonlocal_mod=nonlocal_mod)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, temp_conv=[0, 1, 0], temp_stride=[1, 1, 1])
+        self.conv3 = nn.Conv3d(512 * block.expansion, 512 * block.expansion, kernel_size=(3, 1, 1), stride=(2, 1, 1),
+                               padding=(1, 0, 0))
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.drop = nn.Dropout(0.5)
-
+        self.fc1 = nn.Sequential(nn.Linear(512 * block.expansion, 128 * block.expansion),
+                                 nn.Dropout(0.5),
+                                 nn.ReLU(inplace=True))
+        self.fc2 = nn.Linear(128 * block.expansion, num_classes)
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
                 m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
@@ -152,23 +157,33 @@ class I3Res50(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, inputs):
-        feature_map, dis_map = inputs[0], inputs[1]
-        x = self.conv1(feature_map)
+        feature_map, dis_map = inputs[0], inputs[1]   # 1, 3, 50, 100, 100
+        # print(feature_map.shape)
+        x = self.conv1(feature_map)                   # 1, 64, 25, 50, 50
+        # print(x.shape)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool1(x)
 
-        x, _ = self.layer1([x, dis_map])
-        x = self.maxpool2(x)
-        x, _ = self.layer2([x, dis_map])
-        x, _ = self.layer3([x, dis_map])
-        x, _ = self.layer4([x, dis_map])
+        x, _ = self.layer1([x, dis_map])              # 1, 256, 25, 50, 50
+        # print(x.shape)
+        x, _ = self.layer2([x, dis_map])              # 1, 512, 25, 25, 25
+        # print(x.shape)
+        x = self.conv2(x)                             # 1, 512, 13, 25, 25
+        # print(x.shape)
+        x, _ = self.layer3([x, dis_map])              # 1, 1024, 13, 13, 13
+        # print(x.shape)
+        x, _ = self.layer4([x, dis_map])              # 1, 2048, 13, 7, 7
+        # print(x.shape)
+        x = self.conv3(x)                             # 1, 2048, 7, 7, 7
+        # print(x.shape)
 
-        x = self.avgpool(x)
-        x = self.drop(x)
-
+        x = self.avgpool(x)                           # 1, 2048, 1, 1, 1
+        # print(x.shape)
         x = x.view(x.shape[0], -1)
-        x = self.fc(x)
+        x = self.fc1(x)                               # 1, 512
+        # print(x.shape)
+        x = self.fc2(x)
+
         return x
     #
     # def forward_multi(self, x):
@@ -206,18 +221,15 @@ class I3Res50(nn.Module):
 
 def i3_res50(num_classes):
     net = I3Res50(num_classes=num_classes, use_nl=False)
-    # state_dict = torch.load('pretrained/i3d_r50_kinetics.pth')
-    # net.load_state_dict(state_dict)
-    # freeze_bn(net, "net") # Only needed for finetuning. For validation, .eval() works.
     return net
 
 
 if __name__ == '__main__':
     net = i3_res50(2)
-    inputs = torch.randn(1, 3, 100, 100, 50)
-    dis_map = torch.randn(1, 1, 100, 100, 50)
+    inputs = torch.randn(1, 3, 50, 100, 100)
+    dis_map = torch.randn(1, 1, 50, 100, 100)
     prediction = net([inputs, dis_map])
     print(prediction.shape)
-    print(net)
+    # print(net)
     # inp = {'frames': torch.rand(4, 3, 32, 224, 224)}
     # pred, losses = net(inp)

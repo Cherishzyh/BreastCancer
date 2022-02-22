@@ -46,22 +46,33 @@ def IntraSliceFilter(attention, diff_value, kernel_size=(1, 3, 3)):
 
     return new_attention
 
-base_rate = 0.05
-data = np.load(r'V:\yhzhang\BreastNpy\Roi\A001_CHEN HAN YING.npy')
-resolution = (1.0, 1.0, 1.5)
-slice_rate = resolution[2] / resolution[0] * base_rate
+# base_rate = 0.1
+# resolution = (1.0, 1.0, 1.5)
+# slice_rate = resolution[2] / resolution[0] * base_rate
+# for case in os.listdir(r'V:\yhzhang\BreastNpy\Roi'):
+#     if not (case == 'A031_SU YING.npy' or case == 'A070_YAO YAN.npy'):
+#         continue
+#     try:
+#         data = np.load(os.path.join(r'V:\yhzhang\BreastNpy\Roi', case))
+#         new_data = InterSliceFilter(data, slice_rate)
+#         new_data = IntraSliceFilter(new_data, base_rate)
+#         np.save(os.path.join(r'C:\Users\82375\Desktop\test', case), new_data)
+#     except Exception as e:
+#         print(e)
+#         print(case)
 
-result = InterSliceFilter(roi, slice_rate)
-result = IntraSliceFilter(result, base_rate)
-new_data = IntraSliceFilter(data)
-new_data = InterSliceFilter(new_data)
-
-flatten_data = FlattenImages(np.transpose(data, axes=(2, 0, 1)))
-flatten_roi = FlattenImages(np.transpose(new_data, axes=(2, 0, 1)))
-
-plt.subplot(121)
-plt.imshow(flatten_data, cmap='gray')
-plt.subplot(122)
-plt.contour(flatten_roi, colors='r')
-plt.axis('off')
-plt.show()
+for case in os.listdir(r'V:\yhzhang\BreastNpy\Roi'):
+    print(case)
+    data = np.load(os.path.join(r'V:\yhzhang\BreastNpy\Roi', case))
+    new_data = np.load(os.path.join(r'C:\Users\82375\Desktop\test', case))
+    flatten_data = FlattenImages(np.transpose(data, axes=(2, 0, 1)))
+    flatten_roi = FlattenImages(np.transpose(new_data, axes=(2, 0, 1)))
+    plt.figure(figsize=(16, 8))
+    plt.subplot(121)
+    plt.axis('off')
+    plt.imshow(flatten_data, cmap='gray')
+    plt.subplot(122)
+    plt.axis('off')
+    plt.imshow(flatten_roi, cmap='gray')
+    plt.savefig(os.path.join(r'C:\Users\82375\Desktop\new_image', case.split('.npy')[0]))
+    plt.close()
