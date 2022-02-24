@@ -106,10 +106,10 @@ class Bottleneck(nn.Module):
 
 class I3Res50(nn.Module):
 
-    def __init__(self, block=Bottleneck, layers=[3, 4, 6, 3], num_classes=400, use_nl=False):
+    def __init__(self, input_planes=3, block=Bottleneck, layers=[3, 4, 6, 3], num_classes=400, use_nl=False):
         self.inplanes = 64
         super(I3Res50, self).__init__()
-        self.conv1 = nn.Conv3d(3, 64, kernel_size=(5, 7, 7), stride=(2, 2, 2), padding=(2, 3, 3), bias=False)
+        self.conv1 = nn.Conv3d(input_planes, 64, kernel_size=(5, 7, 7), stride=(2, 2, 2), padding=(2, 3, 3), bias=False)
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
         # self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 3, 3), stride=(2, 2, 2), padding=(0, 0, 0))
@@ -185,49 +185,26 @@ class I3Res50(nn.Module):
         x = self.fc2(x)
 
         return x
-    #
-    # def forward_multi(self, x):
-    #     clip_preds = []
-    #     for clip_idx in range(x.shape[1]):  # B, 10, 3, 3, 32, 224, 224
-    #         spatial_crops = []
-    #         for crop_idx in range(x.shape[2]):
-    #             clip = x[:, clip_idx, crop_idx]
-    #             clip = self.forward_single(clip)
-    #             spatial_crops.append(clip)
-    #         spatial_crops = torch.stack(spatial_crops, 1).mean(1)  # (B, 400)
-    #         clip_preds.append(spatial_crops)
-    #     clip_preds = torch.stack(clip_preds, 1).mean(1)  # (B, 400)
-    #     return clip_preds
-    #
-    # def forward(self, batch):
-    #
-    #     # 5D tensor == single clip
-    #     if batch['frames'].dim() == 5:
-    #         pred = self.forward_single(batch['frames'])
-    #
-    #     # 7D tensor == 3 crops/10 clips
-    #     elif batch['frames'].dim() == 7:
-    #         pred = self.forward_multi(batch['frames'])
-    #
-    #     loss_dict = {}
-    #     if 'label' in batch:
-    #         loss = F.cross_entropy(pred, batch['label'], reduction='none')
-    #         loss_dict = {'loss': loss}
-    #
-    #     return pred, loss_dict
 
 
 # -----------------------------------------------------------------------------------------------#
 
-def i3_res50(num_classes):
-    net = I3Res50(num_classes=num_classes, use_nl=False)
+def i3_res50(input_planes, num_classes):
+    net = I3Res50(input_planes=input_planes, num_classes=num_classes, use_nl=False)
     return net
 
 
 if __name__ == '__main__':
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     net = i3_res50(2)
-    inputs = torch.randn(1, 3, 50, 100, 100)
-    dis_map = torch.randn(1, 1, 50, 100, 100)
+    if torch.cuda.device_count() > 1:
+        print("Use", torch.cuda.device_count(), 'gpus')
+        net = nn.DataParallel(net)
+
+    net.to(device)
+    inputs = torch.randn(12, 3, 50, 100, 100).to(device)
+    dis_map = torch.randn(12, 1, 50, 100, 100).to(device)
     prediction = net([inputs, dis_map])
     print(prediction.shape)
     # print(net)
