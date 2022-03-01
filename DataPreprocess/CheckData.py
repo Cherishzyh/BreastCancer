@@ -164,8 +164,6 @@ def LoadData(type_list):
     data_folder = r'V:\jzhang\breastFormatNew'
 
     for case in os.listdir(data_folder):
-        # if 'E416' not in case:
-        #     continue
         case_folder = os.path.join(data_folder, case)
         if not os.path.isdir(case_folder):
             continue
@@ -218,10 +216,10 @@ def TestCrop():
 def CropData3D():
     from MeDIT.ArrayProcess import ExtractBlock
     from MeDIT.Normalize import NormalizeZ
-    # os.mkdir(r'V:\yhzhang\BreastNpyCorrect\Einitial')
-    # os.mkdir(r'V:\yhzhang\BreastNpyCorrect\DWIb2000')
-    # os.mkdir(r'V:\yhzhang\BreastNpyCorrect\DWIb1000')
-    # os.mkdir(r'V:\yhzhang\BreastNpyCorrect\T1WI_pos')
+    os.mkdir(r'V:\yhzhang\BreastNpyCorrect\Einitial')
+    os.mkdir(r'V:\yhzhang\BreastNpyCorrect\DWIb2000')
+    os.mkdir(r'V:\yhzhang\BreastNpyCorrect\DWIb1000')
+    os.mkdir(r'V:\yhzhang\BreastNpyCorrect\T1WI_pos')
     for case, image_list, data_list in LoadData(['e_initial_1.nii.gz', 'dwi_b2000_Reg.nii', 'dwi_b1000_Reg.nii', 't1_post_reset.nii.gz', 'roi3D.nii']):
         print(case)
         Einitial = data_list[0]
@@ -234,6 +232,12 @@ def CropData3D():
         crop_DWIb2000, _ = ExtractBlock(DWIb2000, (100, 100, 50), center_point=(y, x, z), is_shift=True)
         crop_DWIb1000, _ = ExtractBlock(DWIb1000, (100, 100, 50), center_point=(y, x, z), is_shift=True)
         crop_T1WI_pos, _ = ExtractBlock(T1WI_pos, (100, 100, 50), center_point=(y, x, z), is_shift=True)
+
+        crop_Einitial = crop_Einitial.transpose((2, 0, 1))
+        crop_DWIb2000 = crop_DWIb2000.transpose((2, 0, 1))
+        crop_DWIb1000 = crop_DWIb1000.transpose((2, 0, 1))
+        crop_T1WI_pos = crop_T1WI_pos.transpose((2, 0, 1))
+
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Einitial', '{}.npy'.format(case)), NormalizeZ(crop_Einitial))
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\DWIb2000', '{}.npy'.format(case)), NormalizeZ(crop_DWIb2000))
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\DWIb1000', '{}.npy'.format(case)), NormalizeZ(crop_DWIb1000))
@@ -242,20 +246,20 @@ def CropData3D():
 # CropData3D()
 
 
-from MeDIT.Visualization import FlattenImages
-for case in os.listdir(r'/home/zhangyihong/Documents/BreastNpy/T1WI_pos'):
-    # data = np.load(os.path.join(r'Y:\BreastNPYCorrect\T1WI_pos', case))
-    data = np.load(os.path.join(r'/home/zhangyihong/Documents/BreastNpy/T1WI_pos', case))
-    roi = np.load(os.path.join(r'/home/zhangyihong/Documents/BreastNpy/RoiDilated', case))
-    flatten_data = FlattenImages(data)
-    flatten_roi = FlattenImages(roi)
-    # flatten_data = FlattenImages(np.transpose(data, axes=(2, 0, 1)))
-    # flatten_roi = FlattenImages(np.transpose(roi, axes=(2, 0, 1)))
-
-    plt.figure(figsize=(16, 16))
-    plt.imshow(flatten_data, cmap='gray')
-    plt.contour(flatten_roi, colors='r')
-    plt.axis('off')
-    plt.show()
+# from MeDIT.Visualization import FlattenImages
+# for case in os.listdir(r'/home/zhangyihong/Documents/BreastNpy/T1WI_pos'):
+#     # data = np.load(os.path.join(r'Y:\BreastNPYCorrect\T1WI_pos', case))
+#     data = np.load(os.path.join(r'/home/zhangyihong/Documents/BreastNpy/T1WI_pos', case))
+#     roi = np.load(os.path.join(r'/home/zhangyihong/Documents/BreastNpy/RoiDilated', case))
+#     flatten_data = FlattenImages(data)
+#     flatten_roi = FlattenImages(roi)
+#     # flatten_data = FlattenImages(np.transpose(data, axes=(2, 0, 1)))
+#     # flatten_roi = FlattenImages(np.transpose(roi, axes=(2, 0, 1)))
+#
+#     plt.figure(figsize=(16, 16))
+#     plt.imshow(flatten_data, cmap='gray')
+#     plt.contour(flatten_roi, colors='r')
+#     plt.axis('off')
+#     plt.show()
     # plt.savefig(os.path.join(r'V:\yhzhang\BreastNpy\Image', '{}.jpg'.format(case.split('.npy')[0])))
     # plt.close()
