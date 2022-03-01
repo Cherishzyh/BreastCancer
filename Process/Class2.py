@@ -75,7 +75,7 @@ def EnsembleTrain(device, model_root, model_name, data_root, type_list):
         train_loader, train_batches = _GetLoader(data_root, sub_train, type_list, param_config, input_shape, batch_size, True)
         val_loader, val_batches = _GetLoader(data_root, sub_val, type_list, None, input_shape, batch_size, False)
 
-        model = i3_res50(len(type_list), 1)
+        model = i3_res50(len(type_list), 2)
         if torch.cuda.device_count() > 1:
             print("Use", torch.cuda.device_count(), 'gpus')
             model = nn.DataParallel(model)
@@ -84,7 +84,7 @@ def EnsembleTrain(device, model_root, model_name, data_root, type_list):
         model.apply(HeWeightInit)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        bce_loss = torch.nn.BCEWithLogitsLoss()
+        bce_loss = torch.nn.CrossEntropyLoss()
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=10, factor=0.5, verbose=True)
         early_stopping = EarlyStopping(store_path=str(sub_model_folder / '{}-{:.6f}.pt'), patience=50, verbose=True)
         writer = SummaryWriter(log_dir=str(sub_model_folder / 'log'), comment='Net')
@@ -105,13 +105,13 @@ def EnsembleTrain(device, model_root, model_name, data_root, type_list):
 
                 optimizer.zero_grad()
 
-                loss = bce_loss(preds, torch.unsqueeze(outputs, dim=1))
+                loss = bce_loss(preds, outputs.long())
                 loss.backward()
                 optimizer.step()
 
                 train_loss += loss.item()
 
-                train_pred.append(torch.sigmoid(torch.squeeze(preds)).detach())
+                train_pred.append(torch.sigmoid(preds)[:, 1].detach())
                 train_label.append(outputs.data)
 
             train_label = torch.cat(train_label)
@@ -132,11 +132,11 @@ def EnsembleTrain(device, model_root, model_name, data_root, type_list):
 
                     preds = model([inputs, dis_map])
 
-                    loss = bce_loss(preds, torch.unsqueeze(outputs, dim=1))
+                    loss = bce_loss(preds, outputs.long())
 
                     val_loss += loss.item()
 
-                    val_pred.append(torch.sigmoid(torch.squeeze(preds)).detach())
+                    val_pred.append(torch.sigmoid(preds)[:, 1].detach())
                     val_label.append((outputs.data))
 
             val_label = torch.cat(val_label)
@@ -171,46 +171,6 @@ def EnsembleTrain(device, model_root, model_name, data_root, type_list):
         writer.close()
 
         del writer, optimizer, scheduler, early_stopping, model
-
-
-def CheckInput(device, model_folder, model_name, data_root):
-    from MeDIT.Visualization import Imshow3DArray
-    from MeDIT.Normalize import Normalize01
-    torch.autograd.set_detect_anomaly(True)
-
-    input_shape = (100, 100)
-    batch_size = 2
-
-    param_config = {
-        RotateTransform.name: {'theta': ['uniform', -10, 10]},
-        ShiftTransform.name: {'horizontal_shift': ['uniform', -0.05, 0.05],
-                              'vertical_shift': ['uniform', -0.05, 0.05]},
-        ZoomTransform.name: {'horizontal_zoom': ['uniform', 0.95, 1.05],
-                             'vertical_zoom': ['uniform', 0.95, 1.05]},
-        FlipTransform.name: {'horizontal_flip': ['choice', True, False]},
-        BiasTransform.name: {'center': ['uniform', -1., 1., 2],
-                             'drop_ratio': ['uniform', 0., 1.]},
-        NoiseTransform.name: {'noise_sigma': ['uniform', 0., 0.03]},
-        ContrastTransform.name: {'factor': ['uniform', 0.8, 1.2]},
-        GammaTransform.name: {'gamma': ['uniform', 0.8, 1.2]},
-        ElasticTransform.name: ['elastic', 1, 0.1, 256]
-    }
-
-    spliter = DataSpliter()
-    cv_generator = spliter.SplitLabelCV(r'V:\yhzhang\BreastNpy\alltrain_label.csv',
-                                        store_root=Path(model_folder))
-    for cv_index, (sub_train, sub_val) in enumerate(cv_generator):
-        train_loader, train_batches = _GetLoader(data_root, sub_train, param_config, input_shape, batch_size, True)
-
-        for ind, (inputs, outputs) in enumerate(train_loader):
-            data1 = inputs[0]
-            data2 = inputs[1]
-            data3 = inputs[2]
-            data4 = inputs[3]
-            merge_data = np.concatenate([np.concatenate([data1[0], data2[0]], axis=1),
-                                         np.concatenate([data3[0], data4[0]], axis=1)], axis=2)
-            Imshow3DArray(Normalize01(merge_data))
-            print()
 
 
 if __name__ == '__main__':

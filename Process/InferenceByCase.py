@@ -85,7 +85,7 @@ class InferenceByCase():
         cropped_data = []
         for index, data in enumerate(data_list):
             cropped, _ = ExtractBlock(data, crop_shape, center_point=(y, x, z), is_shift=True)
-            cropped = cropped.transpose(2, 0, 1)         #输入网络是slice，height， width
+            cropped = cropped.transpose(2, 0, 1)         #输入网络是slice, height, width
             if index == len(data_list) - 1:
                 cropped_data.append(cropped)
                 if is_dilated:
@@ -99,7 +99,7 @@ class InferenceByCase():
     def LoadImage(self, data_folder,  sub_list, type_list, label_path=r''):
         ''' ADC_Reg.nii.gz, ESER_1.nii.gz, t2_W_Reg.nii.gz.....roi3D.nii '''
         from MeDIT.SaveAndLoad import LoadImage
-        label_df = pd.read_csv(label_path, index_col='CaseName')
+        label_df = pd.read_csv(r'/home/zhangyihong/Documents/BreastNpyCorrect/label.csv', index_col='CaseName')
         for case in sorted(os.listdir(data_folder)):
             if len(sub_list) == 0: pass
             else:
@@ -121,7 +121,7 @@ class InferenceByCase():
         cv_folder_list = [one for one in IterateCase(model_folder, only_folder=True, verbose=0)]
         cv_pred_list, cv_label_list, case_list = [], [], []
         for cv_index, cv_folder in enumerate(cv_folder_list):
-            model = i3_res50(1, 1)
+            model = i3_res50(len(type_list) - 1, 1)
             if torch.cuda.device_count() > 1:
                 print("Use", torch.cuda.device_count(), 'gpus')
                 model = nn.DataParallel(model)
@@ -144,20 +144,22 @@ class InferenceByCase():
                                                                 label_path=os.path.join(data_folder, 'label.csv'),
                                                                 sub_list=sub_list,
                                                                 type_list=type_list):
-                    inputs = self.CropData3D(case, data_list)
-                    dis_map = MoveTensorsToDevice(torch.unsqueeze(inputs[-1], dim=1), device)
-                    inputs = MoveTensorsToDevice(torch.stack(inputs[:-2], dim=1), device)
+                    inputs = self.CropData3D(data_list)
+                    dis_map = MoveTensorsToDevice(torch.unsqueeze(torch.from_numpy(inputs[-1]), dim=0), device)
+                    inputs = MoveTensorsToDevice(torch.stack([torch.from_numpy(inputs[0]),
+                                                              torch.from_numpy(inputs[1]),
+                                                              torch.from_numpy(inputs[2])], dim=0), device)
 
-                    preds = model([inputs, dis_map])
+                    preds = model([torch.unsqueeze(inputs, dim=0), torch.unsqueeze(dis_map, dim=0)])
 
                     pred_list.append(torch.sigmoid(torch.squeeze(preds)).detach())
                     label_list.append(torch.tensor(label))
                     if cv_index == 0: case_list.append(case)
 
-            cv_pred_list.append(torch.cat(pred_list))
-            cv_label_list.append(torch.cat(label_list))
+            cv_pred_list.append(torch.stack(pred_list))
+            cv_label_list.append(torch.stack(label_list))
 
-            auc = roc_auc_score(torch.cat(label_list).tolist(), torch.cat(pred_list).tolist())
+            auc = roc_auc_score(torch.stack(label_list).tolist(), torch.stack(pred_list).tolist())
             print(auc)
 
             del model, weights_path
@@ -165,7 +167,7 @@ class InferenceByCase():
         cv_pred = torch.stack(cv_pred_list)
         cv_label = torch.stack(cv_label_list)
         mean_pred = torch.mean(cv_pred, dim=0).cpu().detach().numpy()
-        mean_label = torch.mean(cv_label, dim=0).cpu().detach().numpy()
+        mean_label = torch.mean(cv_label.float(), dim=0).cpu().detach().numpy()
         auc = roc_auc_score(mean_label, mean_pred)
         print(auc)
         df = pd.DataFrame({'CaseName': case_list, 'Label': mean_label, 'Pred': mean_pred})
@@ -250,15 +252,15 @@ class InferenceByCase():
 
 
 def DataPreprocess(save_figure=r'V:\yhzhang\BreastNPYCorrect'):
-    type_list = ['ESER_1.nii.gz', 'ADC_Reg.nii.gz', 't2_W_Reg.nii.gz', 'roi3D.nii']
+    type_list = ['ADC_Reg.nii.gz', 'ESER_1.nii.gz', 't2_W_Reg.nii.gz', 'roi3D.nii']
     inference = InferenceByCase()
     for case, _, data_list, _ in inference.LoadImage(data_folder,
                                                      sub_list=[],
                                                      type_list=type_list,
                                                      label_path=r'V:\yhzhang\BreastNPYCorrect\label.csv'):
         cropped_data = inference.CropData3D(case, data_list, crop_shape=(120, 120, 50), is_dilated=True)
-        np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Eser', '{}.npy'.format(case)), cropped_data[0])
-        np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Adc', '{}.npy'.format(case)), cropped_data[1])
+        np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Adc', '{}.npy'.format(case)), cropped_data[0])
+        np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Eser', '{}.npy'.format(case)), cropped_data[1])
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\T2', '{}.npy'.format(case)), cropped_data[2])
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\Roi', '{}.npy'.format(case)), cropped_data[3])
         np.save(os.path.join(r'V:\yhzhang\BreastNpyCorrect\RoiDilated', '{}.npy'.format(case)), cropped_data[4])
@@ -291,14 +293,14 @@ def DataPreprocess(save_figure=r'V:\yhzhang\BreastNPYCorrect'):
 
 
 if __name__ == '__main__':
-    model_root = r'/home/zhangyihong/Documents/BreastNpyCorrect/Model'
-    data_folder = r'V:\yhzhang\BreastNii'
+    model_root = r'/home/zhangyihong/Documents/BreastNpy/Model'
+    data_root = r'/home/zhangyihong/Documents/BreastNpy'
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     alltrain_list = pd.read_csv(r'/home/zhangyihong/Documents/BreastNpyCorrect/alltrain_label.csv', index_col='CaseName').index.tolist()
     test_list = pd.read_csv(r'/home/zhangyihong/Documents/BreastNpyCorrect/test.csv', index_col='CaseName').index.tolist()
 
     inference = InferenceByCase()
-    for model_name in ['ResNet3D_20220224', 'ResNet3D_20220224_Adc', 'ResNet3D_20220224_Eser', 'ResNet3D_20220224_T2']:
+    for model_name in ['ResNet3D_20220222', 'ResNet3D_20220223_Adc', 'ResNet3D_20220223_Eser', 'ResNet3D_20220223_T2']:
         if 'Adc' in model_name:
             type_list = ['ADC_Reg.nii.gz', 'roi3D.nii']
         elif 'Eser' in model_name:
